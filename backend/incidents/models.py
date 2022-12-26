@@ -28,7 +28,7 @@ class Incidents(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.assigned_to.username if self.assigned_to else None
+        return "%s (%s)" % (self.urgency, self.id)
 
     class Meta:
         verbose_name = "Incident"

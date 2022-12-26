@@ -21,5 +21,6 @@ from .api import api
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
     url(r'^api/', include('djoser.urls')),
+    url(r'^api/', include('djoser.urls.jwt')),
     url(r'^api/', api.urls),
 ]
