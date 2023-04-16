@@ -48,3 +48,24 @@ def delete_incident(request, incident_id: str):
     incident = get_object_or_404(Incidents, id=incident_id)
     incident.delete()
     return {"success": True}
+
+
+@router.get('logs', response=List[ActivityLogSchema])
+@paginate(CustomPagination)
+def get_activity_logs(request):
+    qs = ActivityLog.objects.all()
+    return qs
+
+@router.get('notifications', response=List[NotificationSchema])
+@paginate(CustomPagination)
+def get_notifications(request):
+    qs = Notification.objects.all()
+    return qs
+
+@router.put('notifications/{notification_id}')
+def update_notifications(request, notification_id: str, payload: NotificationSchema):
+    notification = get_object_or_404(Notification, id=notification_id)
+    for attr, value in payload.dict().items():
+        setattr(notification, attr, value)
+    notification.save()
+    return {"success": True}
