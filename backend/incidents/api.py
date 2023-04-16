@@ -1,10 +1,10 @@
 from ninja import Router
 from ninja.pagination import paginate
-from .models import Incidents
+from .models import Incidents, ActivityLog, Notification
 from teams.models import Team
 from typing import List
 from django.shortcuts import get_object_or_404
-from .schema import IncidentsSchema
+from .schema import IncidentsSchema, ActivityLogSchema, NotificationSchema
 from django.contrib.auth.models import User
 from incidentmanagement.pagination import CustomPagination
 
@@ -16,7 +16,7 @@ def get_incidents(request):
     qs = Incidents.objects.all()
     return qs
 
-@router.get('/{team_id}/list', response=List[IncidentsSchema])
+@router.get('/{team_id}/list/', response=List[IncidentsSchema])
 @paginate(CustomPagination)
 def get_incidents_by_assigned(request, team_id: str):
     team_obj = Team.objects.get(id=team_id)
