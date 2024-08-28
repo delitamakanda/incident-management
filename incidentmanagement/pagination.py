@@ -2,6 +2,7 @@ from ninja.pagination import paginate, PaginationBase
 from ninja import Schema
 from typing import List, Any
 
+
 class CustomPagination(PaginationBase):
     class Input(Schema):
         skip: int
@@ -18,3 +19,4 @@ class CustomPagination(PaginationBase):
             'per_page': 5,
             'total': queryset.count(),
         }
+    

@@ -17,8 +17,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 TEMPLATES_DIR = os.path.join(BASE_DIR, 'templates')
 
-FRONTEND_DIR = os.path.join(BASE_DIR, 'theme')
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/
 
@@ -44,10 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.humanize',
     'ninja',
     'corsheaders',
-    'django_vite',
     'incidents',
-    'teams',
-    'workspaces',
 ]
 
 MIDDLEWARE = [
@@ -183,10 +178,11 @@ LOGGING = {
     "root": {"level": "INFO", "handlers": ["console"]},
 }
 
-# Vite configuration
-DJANGO_VITE = {
-    "default": {
-        "dev_mode": DEBUG,
-        "manifest_path": os.path.join(BASE_DIR, "theme", "dist", "manifest.json"),
-    }
-}
+# Celery
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'

@@ -1,4 +1,3 @@
-{% load django_vite %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,10 +10,25 @@
 <noscript>
     <strong>Warning:</strong> Your browser does not support JavaScript. Please enable JavaScript in order to use this application.
 </noscript>
-<div id="app"></div>
-{% block headscripts %}
-{% vite_hmr_client %}
-{% vite_asset 'theme/src/main.js' %}
-{% endblock %}
+<h1>Dashboard</h1>
+<table>
+    <tr>
+        <th>Host</th>
+        <th>Service</th>
+        <th>Status</th>
+        <th>Last Output</th>
+        <th>Last Check</th>
+    </tr>
+    {% for service in services %}
+        <tr>
+            <td>{{ service.host.name }}</td>
+            <td>{{ service.name }}</td>
+            <td>{{ service.status }}</td>
+            <td>{{ service.last_output }}</td>
+            <td>{{ service.last_check }}</td>
+        </tr>
+    {% endfor %}
+</table>
+
 </body>
 </html>

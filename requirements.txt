@@ -36,3 +36,4 @@ typing-extensions==4.12.2
 uritemplate==4.1.1
 urllib3==1.26.13
 whitenoise==6.6.0
+celery==5.4.0
