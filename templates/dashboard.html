@@ -12,22 +12,76 @@
 </noscript>
 <h1>Dashboard</h1>
 <table>
+     {% if services %}
     <tr>
-        <th>Host</th>
         <th>Service</th>
-        <th>Status</th>
-        <th>Last Output</th>
-        <th>Last Check</th>
     </tr>
+
     {% for service in services %}
         <tr>
-            <td>{{ service.host.name }}</td>
             <td>{{ service.name }}</td>
-            <td>{{ service.status }}</td>
-            <td>{{ service.last_output }}</td>
-            <td>{{ service.last_check }}</td>
         </tr>
     {% endfor %}
+    {% else %}
+    <tr>
+        <td>No services available.</td>
+    </tr>
+    {% endif %}
+</table>
+
+
+<table>
+    {% if activity_logs %}
+    <tr>
+        <th>Activity Logs</th>
+        <th>Stack Trace</th>
+        <th>Occurence count</th>
+        <th>Resolved</th>
+    </tr>
+    {% for activity_log in activity_logs %}
+    <tr>
+        <td>{{ activity_log.error_message }}</td>
+        <td>{{ activity_log.stack_trace }}</td>
+        <td>{{ activity_log.occurence_count }}</td>
+         <td>{{ activity_log.resolved }}</td>
+    </tr>
+    {% endfor %}
+    {% else %}
+    <tr>
+        <td>No activity logs available.</td>
+    </tr>
+    {% endif %}
+</table>
+
+{% if schedules %}
+<ul>
+    {% for schedule in schedules %}
+        <li>{{ schedule.user.username }}: {{ schedule.start_time }} - {{ schedule.end_time }}</li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>No schedules available.</p>
+{% endif %}
+
+<table>
+    {% if statuses %}
+    <tr>
+        <th>Host</th>
+        <th>Status</th>
+        <th>Status Code</th>
+    </tr>
+    {% for name, details in statuses.items %}
+    <tr>
+        <td>{{ name }}</td>
+        <td style="color: {% if details.status == 'OK' %}green{% else %}red{% endif %};">{{ details.status }}</td>
+        <td>{{ details.status_code }}</td>
+    </tr>
+    {% endfor %}
+    {% else %}
+    <tr>
+        <td>No statuses available.</td>
+    </tr>
+    {% endif %}
 </table>
 
 </body>

@@ -1,20 +1,93 @@
 import uuid
+from datetime import datetime
+
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.contrib.auth.models import User
 
 
-STATUT_CHOICES = (
-    (0, 'In progress'),
-    (1, 'Resolved'),
-    (2, 'Closed'),
-    (3, 'Pending'),
-    (4, 'Investigating'),
-    (5, 'Remediated'),
-    (6, 'Out of Scope'),
-    (7, 'Deferred'),
-    (8, 'Canceled'),
-    (9, 'Reopened'),
-)
+class DateTimeStamp(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        abstract = True
+        ordering = ['-id']
+
+
+class Team(DateTimeStamp):
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    members = models.ManyToManyField(User, related_name='teams')
+    
+    class Meta:
+        verbose_name = 'Team'
+        verbose_name_plural = 'Teams'
+        ordering = ['id']
+        unique_together = ('name',)
+    
+    def __str__(self):
+        return self.name
+    
+    def get_members(self):
+        return ', '.join([member.username for member in self.members.all()])
+    
+    def get_member_count(self):
+        return self.members.count()
+    
+    def get_open_incident_count(self):
+        return self.incidents.filter(status__lt=2).count()
+    
+    def get_resolved_incident_count(self):
+        return self.incidents.filter(status__gt=0).count()
+    
+    def get_closed_incident_count(self):
+        return self.incidents.filter(status=2).count()
+    
+    def get_total_incident_count(self):
+        return self.incidents.count()
+    
+    def get_average_resolution_time(self):
+        total_resolution_time = sum([incident.resolution_time for incident in self.incidents.filter(status__gt=0)])
+        average_resolution_time = total_resolution_time / self.get_resolved_incident_count() if self.get_resolved_incident_count() > 0 else 0
+        return average_resolution_time
+    
+    def get_average_response_time(self):
+        total_response_time = sum([incident.response_time for incident in self.incidents.filter(status__lt=2)])
+        average_response_time = total_response_time / self.get_open_incident_count() if self.get_open_incident_count() > 0 else 0
+        return average_response_time
+    
+    def get_average_impact_score(self):
+        total_impact_score = sum([incident.impact_score for incident in self.incidents.filter(status__lt=2)])
+        average_impact_score = total_impact_score / self.get_open_incident_count() if self.get_open_incident_count() > 0 else 0
+        return average_impact_score
+    
+
+class OnCallSchedule(models.Model):
+    team = models.ForeignKey(Team, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    
+    class Meta:
+        verbose_name = 'On Call Schedule'
+        verbose_name_plural = 'On Call Schedules'
+        ordering = ['start_time']
+        unique_together = ('team', 'user','start_time', 'end_time')
+    
+    def __str__(self):
+        return f'{self.user.username} on-call {self.team.name}'
+    
+    def get_duration(self):
+        return (self.end_time - self.start_time).total_seconds() / 60
+    
+    def get_status(self):
+        if self.start_time <= datetime.now() <= self.end_time:
+            return 'On-call'
+        elif self.start_time > datetime.now():
+            return 'Upcoming'
+        else:
+            return 'Off-call'
+
 
 STATUS_CHOICES = (
     (0, 'OK'),
@@ -26,7 +99,7 @@ STATUS_CHOICES = (
 )
 
 
-class Incidents(models.Model):
+class Incidents(DateTimeStamp):
     LOW = 'LOW'
     HIGH = 'HIGH'
     NORMAL = 'NORMAL'
@@ -46,34 +119,50 @@ class Incidents(models.Model):
         (BREAKDOWN_ESCALATION, 'Breakdown Ops Escalation'),
     )
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    team = models.ForeignKey(Team, on_delete=models.CASCADE)
     urgency = models.CharField(max_length=255, choices=URGENCY_CHOICES, default=NORMAL)
-    triggered = models.BooleanField(default=False)
-    acknowledged = models.BooleanField(default=False)
     resolved = models.BooleanField(default=False)
-    statut = models.CharField(max_length=1, choices=STATUT_CHOICES, default=0)
+    status = models.CharField(max_length=1, choices=STATUS_CHOICES, default=0)
+    title = models.CharField(max_length=255)
     description = models.CharField(max_length=255, choices=DESCRIPTION_CHOICES, default=DEVOPS_ESCALATION)
-    notes = models.TextField(blank=True, null=True)
-    assigned_to = models.ForeignKey(User, blank=True, null=True, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    reported_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return "%s (%s)" % (self.urgency, self.id)
+        return "%s" % self.title
 
     class Meta:
         verbose_name = "Incident"
         verbose_name_plural = "Incidents"
         ordering = ['id']
+        unique_together = ('team', 'id')
+        
+    def get_status_display(self):
+        return dict(STATUS_CHOICES)[self.status]
 
 
-class ActivityLog(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    incident = models.ForeignKey(Incidents, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+class Escalation(models.Model):
+    team = models.ForeignKey(Team, on_delete=models.CASCADE)
+    level = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1), MaxValueValidator(8)])
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    
+    class Meta:
+        verbose_name = "Escalation"
+        verbose_name_plural = "Escalations"
+        ordering = ['level']
+        unique_together = ('team', 'level', 'user')
+    
+    def __str__(self):
+        return f"Level {self.level} escalation for {self.team.name} by {self.user.username}"
+
+
+class ActivityLog(DateTimeStamp):
+    error_message = models.TextField()
+    stack_trace = models.TextField()
+    occurence_count = models.PositiveIntegerField(default=1)
+    resolved = models.BooleanField(default=False)
 
     def __str__(self):
-        return "%s (%s)" % (self.incident, self.id)
+        return f"Error Log: {self.error_message}"
 
     class Meta:
         verbose_name = "Activity Log"
@@ -81,58 +170,20 @@ class ActivityLog(models.Model):
         ordering = ['-id']
 
 
-class Notification(models.Model):
+class Service(DateTimeStamp):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    incident = models.OneToOneField(Incidents, on_delete=models.CASCADE)
-    sms = models.BooleanField(default=False)
-    email = models.BooleanField(default=False)
-    call = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return "%s (%s)" % (self.incident, self.id)
-    
-    class Meta:
-        verbose_name = "Notification"
-        verbose_name_plural = "Notifications"
-        ordering = ['-id']
-        
-        
-class Host(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=255)
-    ip_address = models.GenericIPAddressField()
-    description = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    host = models.URLField(max_length=1000)
+    description = models.TextField(blank=True)
     
     def __str__(self):
-        return self.name
-    
-    class Meta:
-        verbose_name = "Host"
-        verbose_name_plural = "Hosts"
-        ordering = ['id']
-
-
-class Service(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    host = models.ForeignKey(Host, on_delete=models.CASCADE)
-    name = models.CharField(max_length=255)
-    check_command = models.CharField(max_length=255)
-    check_interval = models.PositiveIntegerField()
-    last_check = models.DateTimeField(auto_now=True)
-    status = models.CharField(max_length=1, choices=STATUS_CHOICES, default=0)
-    last_output = models.TextField(blank=True, null=True)
-    
-    def __str__(self):
-        return "%s (%s)" % (self.host.name, self.name)
+        return f"Service: {self.host}"
     
     class Meta:
         verbose_name = "Service"
         verbose_name_plural = "Services"
         ordering = ['id']
+        unique_together = ('host',)
+    
         
 
     
