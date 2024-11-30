@@ -93,7 +93,6 @@ def report_incidents(request):
     return response_wrapper({}, status_code=400, message="Error: Invalid request method")
         
 
-@token_required
 @csrf_exempt
 def report_activity_logs(request):
     if request.method == 'POST':
