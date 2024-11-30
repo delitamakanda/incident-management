@@ -111,7 +111,14 @@ def report_activity_logs(request):
             error.updated_at = now()
             error.save()
         
-        return response_wrapper(error, status_code=201, message="Activity Log Reported")
+        return response_wrapper({
+            'id': error.id,
+            'error_message': error.error_message,
+            'stack_trace': error.stack_trace,
+            'occurence_count': error.occurence_count,
+            'created_at': error.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': error.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+        }, status_code=201, message="Activity Log Reported")
     return response_wrapper({}, status_code=400, message="Error: Invalid request method")
 
 
