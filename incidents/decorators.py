@@ -23,6 +23,7 @@ def token_required(view_func):
             }, status=401)
         
         if token_obj.expiry_date < now():
+            token_obj.delete()
             return JsonResponse({
                 "status_code": 401,
                 "message": "Token expired",
