@@ -1,12 +1,71 @@
 from django.shortcuts import render
-from incidents.models import Service, ActivityLog, Incidents, Team, OnCallSchedule
+from incidents.models import Service, ActivityLog, Incidents, Team, OnCallSchedule, Token, DESCRIPTION_CHOICES, \
+    STATUS_CHOICES, URGENCY_CHOICES
 from django.utils.timezone import now
 import json
 from django.views.decorators.csrf import csrf_exempt
 from incidents.response import response_wrapper
 from incidents.utils import notify_on_call_users, check_api_status
+from django.contrib.auth import authenticate, get_user_model
+from incidents.decorators import token_required
+
+user_model = get_user_model()
+
+@csrf_exempt
+def authenticate_user(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        username = data.get('username')
+        password = data.get('password')
+        
+        user = authenticate(username=username, password=password)
+        
+        if user is not None:
+            token, _ = Token.objects.get_or_create(user=user)
+            return response_wrapper({
+                'token': token.key,
+                'user_id':user.id,
+                'username': user.username,
+            }, status_code=200, message="User authenticated successfully")
+        else:
+            return response_wrapper({}, status_code=401, message="Invalid username or password")
+    return response_wrapper({}, status_code=400, message="Error: Invalid request method")
 
 
+@csrf_exempt
+def verify_token(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        token = data.get('token')
+        
+        try:
+            token_obj = Token.objects.get(key=token)
+            return response_wrapper({
+                'user_id': token_obj.user.id,
+                'username': token_obj.user.username,
+            }, status_code=200, message="Token verified successfully")
+        except Token.DoesNotExist:
+            return response_wrapper({}, status_code=401, message="Invalid token")
+    return response_wrapper({}, status_code=400, message="Error: Invalid request method")
+
+
+@token_required
+@csrf_exempt
+def logout_user(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        token = data.get('token')
+        
+        try:
+            token_obj = Token.objects.get(key=token)
+            token_obj.delete()
+            return response_wrapper({}, status_code=200, message="User logged out successfully")
+        except Token.DoesNotExist:
+            return response_wrapper({}, status_code=401, message="Invalid token")
+    return response_wrapper({}, status_code=400, message="Error: Invalid request method")
+
+
+@token_required
 @csrf_exempt
 def report_incidents(request):
     if request.method == 'POST':
@@ -33,7 +92,8 @@ def report_incidents(request):
         return response_wrapper(incident, status_code=201, message="Incident Reported")
     return response_wrapper({}, status_code=400, message="Error: Invalid request method")
         
-    
+
+@token_required
 @csrf_exempt
 def report_activity_logs(request):
     if request.method == 'POST':
@@ -56,6 +116,7 @@ def report_activity_logs(request):
     return response_wrapper({}, status_code=400, message="Error: Invalid request method")
 
 
+@token_required
 @csrf_exempt
 def report_host(request):
     if request.method == 'POST':
@@ -78,6 +139,7 @@ def report_host(request):
     return response_wrapper({}, status_code=400, message="Error: Invalid request method")
 
 
+@csrf_exempt
 def dashboard(request):
     activity_logs = ActivityLog.objects.all().order_by('-updated_at')
     schedules = OnCallSchedule.objects.all().order_by('-start_time' )
@@ -87,3 +149,25 @@ def dashboard(request):
     statuses = check_api_status(hosts)
     return render(request, 'dashboard.html', {'services': services, 'activity_logs': activity_logs,
                                               'schedules': schedules, 'statuses': statuses})
+
+@token_required
+@csrf_exempt
+def list_urgency_levels(request):
+    if request.method == 'GET':
+        urgency_levels = URGENCY_CHOICES
+        return response_wrapper(urgency_levels, status_code=200)
+    return response_wrapper({}, status_code=400, message="Error: Invalid request method")
+
+@token_required
+@csrf_exempt
+def list_status_levels(request):
+    if request.method == 'GET':
+        return response_wrapper(STATUS_CHOICES, status_code=200)
+    return response_wrapper({}, status_code=400, message="Error: Invalid request method")
+
+@token_required
+@csrf_exempt
+def list_descriptions(request):
+    if request.method == 'GET':
+        return response_wrapper(DESCRIPTION_CHOICES, status_code=200)
+    return response_wrapper({}, status_code=400, message="Error: Invalid request method")

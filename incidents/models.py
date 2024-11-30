@@ -1,5 +1,7 @@
 import uuid
-from datetime import datetime
+import os
+import binascii
+from datetime import datetime, timedelta
 
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
@@ -12,6 +14,23 @@ class DateTimeStamp(models.Model):
     class Meta:
         abstract = True
         ordering = ['-id']
+        
+        
+class Token(models.Model):
+    key = models.CharField(max_length=40, primary_key=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='auth_token')
+    created_at = models.DateTimeField(auto_now_add=True)
+    expiry_date = models.DateTimeField(null=True)
+    
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = binascii.hexlify(os.urandom(20)).decode()
+        if not self.expiry_date or self.expiry_date < datetime.now():
+            self.expiry_date = datetime.now() + timedelta(days=7)  # Set expiry date to 7 days from now
+        super().save(*args, **kwargs)
+        
+    def __str__(self):
+        return self.key
 
 
 class Team(DateTimeStamp):
@@ -98,26 +117,27 @@ STATUS_CHOICES = (
     (5, 'UNREACHABLE'),
 )
 
+LOW = 'LOW'
+HIGH = 'HIGH'
+NORMAL = 'NORMAL'
+URGENCY_CHOICES = (
+    (LOW, 'Low'),
+    (HIGH, 'High'),
+    (NORMAL, 'Normal'),
+)
+DEVOPS_ESCALATION = 'DevOps Escalation'
+SECURITY_ESCALATION = 'Security Ops Escalation'
+PERFORMANCE_ESCALATION = 'Performance Ops Escalation'
+BREAKDOWN_ESCALATION = 'Breakdown Ops Escalation'
+DESCRIPTION_CHOICES = (
+    (DEVOPS_ESCALATION, 'Devops Escalation'),
+    (SECURITY_ESCALATION, 'Security Ops Escalation'),
+    (PERFORMANCE_ESCALATION, 'Performance Ops Escalation'),
+    (BREAKDOWN_ESCALATION, 'Breakdown Ops Escalation'),
+)
+
 
 class Incidents(DateTimeStamp):
-    LOW = 'LOW'
-    HIGH = 'HIGH'
-    NORMAL = 'NORMAL'
-    URGENCY_CHOICES = (
-        (LOW, 'Low'),
-        (HIGH, 'High'),
-        (NORMAL, 'Normal'),
-    )
-    DEVOPS_ESCALATION = 'DevOps Escalation'
-    SECURITY_ESCALATION = 'Security Ops Escalation'
-    PERFORMANCE_ESCALATION = 'Performance Ops Escalation'
-    BREAKDOWN_ESCALATION = 'Breakdown Ops Escalation'
-    DESCRIPTION_CHOICES = (
-        (DEVOPS_ESCALATION, 'Devops Escalation'),
-        (SECURITY_ESCALATION, 'Security Ops Escalation'),
-        (PERFORMANCE_ESCALATION, 'Performance Ops Escalation'),
-        (BREAKDOWN_ESCALATION, 'Breakdown Ops Escalation'),
-    )
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     team = models.ForeignKey(Team, on_delete=models.CASCADE)
     urgency = models.CharField(max_length=255, choices=URGENCY_CHOICES, default=NORMAL)
@@ -138,6 +158,12 @@ class Incidents(DateTimeStamp):
         
     def get_status_display(self):
         return dict(STATUS_CHOICES)[self.status]
+    
+    def get_description_display(self):
+        return dict(DESCRIPTION_CHOICES)[self.description]
+    
+    def get_urgency_display(self):
+        return dict(URGENCY_CHOICES)[self.urgency]
 
 
 class Escalation(models.Model):
