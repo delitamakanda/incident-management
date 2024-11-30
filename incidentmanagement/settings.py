@@ -158,6 +158,18 @@ MANAGERS = ADMINS
 # CORS
 CORS_URLS_REGEX = r'^/api/.*$'
 
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_ALL_ORIGINS = False
+
+CORS_ORIGIN_WHITELIST = [
+    'http://localhost:3000',
+    'http://localhost:8000',
+    'http://localhost:8080',
+    'http://localhost:5001',
+    'http://localhost:8100',
+]
+
 # LOGGING
 LOGGING = {
     "version": 1,
